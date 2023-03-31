@@ -1,0 +1,947 @@
+---
+title: "Assignment 2: Feature Engineering, Statistical Analysis and Machine Learning"
+author: "Pranay Meshram (40280938)"
+output:
+  pdf_document:
+     includes: 
+         in_header: "preamble.tex"
+  html_notebook: default
+  html_document:
+    df_print: paged
+---
+
+## Introduction
+
+This project is about creating a dataset of handwritten letters and symbols including faces to perform different statistical functions on the dataset. We perform feature engineering to allow identifying the handwritten symbols automatically, performing statiscal analysis and implementing machine learning models.
+
+# Section 1
+
+I created the images handwritten by drawing them on GIMP and then read the images as text files in R code, changed the pixel values, converted them to matrices and saved as CSV files. I had to loop through all the individual images and remove column and row names individually to ensure they were not added accidentally into the CSV.
+
+# Section 2
+
+For this section, I had multiple times ran into the difficulty of my code being unable to read the CSV files. I always tried to set the working directory by RStudio but as this issue occurred again and again, I added the following code so that whenever I ran my file, I wouldn't encounter the issue again.
+
+```{r}
+setwd("./")
+```
+
+
+
+
+As needed, I had to loop through all the CSV files to individually calculate the features.
+
+
+**Label feature**
+
+For the label feature, the 'grepl' function was used to match the symbol with file name. 
+
+```{r}
+ if (grepl("40280938_a", fileName, fixed = TRUE)) {
+    label <- "a"
+  }
+```
+
+I had prior used different substring functions to match the filename but it didn't work so I landed on using the 'grepl' function.
+
+**Index feature**
+
+The same function as label, 'grepl' function was used here.
+
+```{r}
+if (grepl("_01", fileName, fixed = TRUE)) {
+    index <- "01"
+  }
+  
+```
+
+The issue I faced here was when saving index as an integer value, '01' was being saved as '1' which was not the aim. To tackle this issue, I saved the index value as string to be converted into integer value later or used directly as string value, based on the needs.
+
+
+
+
+For subsequent features, I initially used the following code to calculate number of rows/cols with x number of black pixels
+
+```{r}
+nrow(imageMatrix[imageMatrix < 2]) 
+```
+(In the above case, it's for calculating number of rows with exactly 1 black pixel)
+
+However after troubleshooting, I found out that was a mistake on coding that I did.
+
+I then used rowSums/colSums as part of 'zoo' library on a logical matrix('imageMatrix == 1') and then created a logical vector '==1'and get the count with 'sum'. I have inlined one of the functions for the code part of it:
+
+```{r}
+  rows_with_1 <- sum(rowSums(imageMatrix == 1) == 1)
+  rows_with_1
+```
+
+
+**Aspect ratio feature**
+
+For the aspect ratio feature, I began with finding the center pixel row and column. I rounded off the value to find the center row and column as of course, the values could be decimal. This could however be a source of error as if we're having odd number of columns or rows, the code will only pick the rounded off value which might not be the center value for some analysts.
+
+With the matrix function, I found the values of the center pixel. For the aspect_ratio function, I calculated the horizontal difference i.e. width instead of height as I found it easier to calculate.
+
+I found the left most and the right most pixel on the same row of the center pixel using this code:
+
+```{r}
+# Right most black pixel column from the center pixel 
+  right_most_pixel = max(which(imageMatrix == 1, arr.ind=TRUE)[8,])
+  
+  # Left most black pixel column from the center pixel 
+  left_most_pixel = min(which(imageMatrix == 1, arr.ind=TRUE)[8,])
+  
+```
+
+
+I deducted both of them to find the width, and that was the aspect_ratio value.
+
+
+
+
+
+
+For subsequent features of finding neighbouring pixels, I looped through each of the values of the matrix. Before doing that, I ensured I padded the matrix to 20x20 using 'cbind' and 'rbind' to ensure the extreme rows and columns doesn't cause error.
+
+As I looped through the matrice, if a black pixel was found, I checked the neighbouring pixels to check for their values. Based on the need of the feature, if any  neighbouring pixel was found, it would be summed with all the neighbouring pixels to see how many black pixels are in the neighbour. Depending on the feature, they would be checked if we just need one black pixel in all the neighbour or no black pixel, and the counter was incremented.
+
+I have added a snippet of the code for counting number of black pixels in the neighbour (neigh_1 feature):
+
+
+```{r}
+ # Feature 7
+  # neigh_1 - Using counter to count the number of black pixels
+  
+  counter = 0
+  
+  # Here a new matrx was created out of the original one with paddings added to it to make it
+  
+  imageNewMatrix <- imageMatrix
+  
+  nrow(imageMatrix)
+  ncol(imageMatrix)
+  
+  imageNewMatrixa <- cbind(imageNewMatrix, 0)
+  imageNewMatrixB <- rbind(imageNewMatrixa, 0)
+  imageNewMatrixC <- cbind(imageNewMatrixB, 0)
+  imageNewMatrixD <- rbind(imageNewMatrixC, 0)
+  nrow(imageNewMatrixD)
+  ncol(imageNewMatrixD)
+  
+  for (row in 2:19) {
+    for (col in 2:19) {
+      if (imageNewMatrixD[row,col] == 1) {
+        
+        # Get entry of the left pixel
+        
+        pixel_to_left = as.numeric(imageNewMatrixD[row, col-1])
+        
+        # Get entry of the right pixel
+        
+        pixel_to_right = as.numeric(imageNewMatrixD[row, col+1])
+        
+        # Get entry of the pixel at top
+        
+        pixel_at_top = as.numeric(imageNewMatrixD[row-1, col])
+        
+        # Get entry of the pixel at top-left
+        
+        pixel_at_top_left = as.numeric(imageNewMatrixD[row-1, col-1])
+        
+        # Get entry of the pixel at top right
+        
+        pixel_at_top_right = as.numeric(imageNewMatrixD[row-1, col+1])
+        
+        # Get entry of the pixel at bottom
+        
+        pixel_at_bottom = as.numeric(imageNewMatrixD[row+1, col])
+        
+        # Get entry of the pixel at bottom left
+        
+        pixel_at_bottom_left = as.numeric(imageNewMatrixD[row+1, col-1])
+        
+        # Get entry of the pixel at bottom right
+        
+        pixel_at_bottom_right = as.numeric(imageNewMatrixD[row+1, col+1])
+        
+        
+        pixel_sum = pixel_to_left + pixel_to_right + pixel_at_top +
+          pixel_at_top_left + pixel_at_top_right + pixel_at_bottom +
+          pixel_at_bottom_left + pixel_at_bottom_right
+        
+        # Using isTrue as one of the pixels is empty and isTrue converts logical(0) to FALSE
+        
+        if (isTRUE(pixel_sum == 1)) {
+          counter = counter + 1
+        } 
+        
+        
+        
+      }
+    }
+    
+  }
+  
+  neigh_1 = counter
+```
+
+
+**connected_areas and eyes feature**
+
+I unfortunately couldn't calculate the two features and used a random number between 1 to 100 to be used for this feature.
+
+**custom feature**
+
+My custom feature was calculating number of rows with no black pixels. I used this feature as I think it is crucial to see how much empty space we have in a image. 
+
+In future, let's say we have images of greater size, we can simply remove the rows with blank data i.e. rows with no black pixels from the very top and very bottom to save space. This is very ideal when we have millions of images as datasets and we have to save space for computation.
+
+I used the same rowSums function to calculate this feature as:
+
+```{r}
+  custom <- sum(rowSums(imageMatrix == 1) == 0)
+  custom
+  
+```
+
+
+**Adding all the features to CSV file**
+
+To add all the features to CSV file, I first added all the features to a vector.
+
+Then I created a CSV file using 'write.table' and added all the features to the CSV file. Since the code was in a loop for each image, I had to turn the 'append' to TRUE so the previous image values would still be saved in the CSV file.
+
+Following is the code for the above explanation:
+
+
+```{r}
+feature <- c(label,index, nr_pix, rows_with_1, cols_with_1,
+               rows_with_3p, cols_with_3p, aspect_ratio,
+               neigh_1, no_neigh_above, no_neigh_below,
+               no_neigh_left, no_neigh_right, no_neigh_horiz,
+               no_neigh_vert, connected_areas, eyes, custom)
+  
+  feature
+  
+  
+  
+  write.table(matrix(feature, nrow=1), file = "./40280938_features.csv",
+              append = TRUE, sep = ',',
+              row.names = FALSE,
+              col.names = FALSE)
+```
+
+
+Now here is a catch. If I tried adding the column names in the 'write.table' code above, it would add column name to every image matrix. That would mean instead of supposedly rows of 141 rows including column name, it would be 248 rows with column name added for each value.
+
+I had that happen to me and I tried to fix this issue. To fix this issue, I set row and column names as 'FALSE' in the above code to only modify them later.
+
+After the loop, I read from the same CSV file, converted the data to a dataframe and this time with column names. Now I sorted the data alphabetically using label only, as it was already sorted by index.
+
+Then I used write.table to overrite the previous CSV storing features with append as 'FALSE'. And this time I had the features in the CSV with column names and just 141 rows! Below is the code for that:
+
+```{r}
+# Reading from the CSV file with all the data present and then overwriting it to add the column names to it
+
+final_data <- read.csv("./40280938_features.csv",
+                       header = FALSE,
+                       col.names = c('label','index', 'nr_pix', 'rows_with_1', 'cols_with_1',
+                                     'rows_with_3p', 'cols_with_3p', 'aspect_ratio',
+                                     'neigh_1', 'no_neigh_above', 'no_neigh_below',
+                                     'no_neigh_left', 'no_neigh_right', 'no_neigh_horiz',
+                                     'no_neigh_vert', 'connected_areas', 'eyes', 'custom'))
+
+# Sorting data alphabetically and then by index
+
+sorted_data_by_label <- final_data[order(final_data$label),]
+
+
+write.table(sorted_data_by_label, file = "./40280938_features.csv",
+            append = FALSE, sep = ',',
+            row.names = FALSE)
+
+```
+
+
+# Section 3
+
+Initially as the first step, I set the working directory. I installed the following libraries and included the reasoning for the libraries as follows:
+
+```{r}
+library(moments)
+```
+
+- for skewness() function
+
+```{r}
+library(robustbase)
+
+```
+
+- for colMedians() function
+
+```{r}
+library(GMCM)
+```
+
+- for colSds() function
+
+```{r}
+library(data.table)
+```
+
+
+- for histogram of feature values of the groups
+
+```{r}
+library(gginference)
+```
+
+- for plotting t.test values in the graph
+
+```{r}
+library(ggstatsplot)
+```
+
+- this library is needed to plot the correlations (linear association) 
+
+```{r}
+library(ggcorrplot)
+```
+
+- this library is needed for the above library, ggstatsplot to work
+
+
+I read the data from the features CSV file.
+
+## Section 3.1
+
+I preferred to use:
+
+```{r}
+hist()
+```
+
+
+The above function create histogram as it created the bin by itself, allowing for easier readability for the data.
+
+I also had to change all the data to numeric form to be easily plotted in the histogram.
+
+For instance, my code would be like:
+
+```{r}
+nr_pix <- as.numeric(data$nr_pix)
+nr_pix
+hist(nr_pix)
+```
+
+
+**nr_pix (Number of pixels)**
+
+```{r}
+hist(nr_pix)
+```
+(Image may vary in preview in this document)
+
+The number of pixels seems like a normal histogram with no skewndness. There are also no outliers in the data. The center of the data seems to be like from 20-25 where most number of black pixels are found. The data are spread out most from 20-30 number of pixels before dropping sharply after. This is a symmetric data. This also shows that for most images, number of black pixels is around twenty to twenty five.
+
+This is a bi-modal histogram.
+
+
+**rows_with_1 (Number of rows with just 1 black pixel)**
+
+```{r}
+hist(rows_with_1)
+```
+This seems like a right skewed (non-normal) histogram. There are no outliers in the data. In this data, the data seems evenly spread with differences in certain parts (0, 4-5 number of rows). The data seems short-tailed as well and we can see that the majority of data is spread around 0-10 number of rows with data before frequency of 2-5 number of rows the maximum. This data also shows that for most images, their number of rows with just one black pixel ranges from four to five.
+
+This is a unimodal histogram.
+
+**cols_with_1 (Number of columns with just 1 black pixel)**
+
+```{r}
+hist(cols_with_1)
+```
+
+This is an extremely right-skewed data with a steep fall in frequency from 0-1 number of columns. There is no outlier in the data however this histogram seems long-tailed because the tails approach zero very slowly. The data only shows frequency falling down with rise in number of columns. This histogram shows that for most images, number of columns with just one black pixel is zero.
+
+This is a unimodal histogram.
+
+**rows_with_3p (Number of rows with three black pixel)**
+
+```{r}
+hist(rows_with_3p)
+```
+ This is a right-skewed (non-normal) histogram as well. However we have an outlier here that is separate from the other values (10-after number of rows). The spread of the data is uneven but there's not a huge difference between the spread. Frequency of data from 6-9 number of rows is consistent and the exact same. The center of the number of rows is at 5 with less than average frequency. The highest frequency shows most rows have less or more than three black pixels.
+ 
+ This is a multimodal histogram.
+ 
+ **cols_with_3p (number of columns with three black pixels)**
+ 
+```{r}
+hist(cols_with_3p)
+```
+ 
+This data is extremely right-skewed with no outliers present. The data is unevenly spread with short-tail as the tail approaches zero very fast. The frequency of columns decline very fastl from the highest frequency. The center of the data seems to be around 5, which is way lower than the highest frequency at 0. The highest frequency shows most columns have less than or more than three black pixels.
+
+This is a bimodal histogram.
+ 
+ **aspect_ratio (aspect ratio)**
+ 
+```{r}
+hist(aspect_ratio)
+```
+ 
+This data is right-skewed as well (non-normal) with no outliers present. The data is almost evenly spread in decline from 1 to 8 as the value of aspect ratio with slight exceptions. The center of the data seems to be around 5 with the highest frequency being at 0.Thus it shows that for most images, aspect ratio is zero.
+
+This is a unimodal histogram.
+
+
+## Section 3.2
+
+For statistical analysis, we calculated mean, median and standard deviation for all set of features for both letters and non-letters.
+
+Since we know that letters are from rows one to eighty (not eighty one as the first row is the column name) and non-letters are from row eighty one to one fourty:
+
+```{r}
+
+only_letters <- data[1:80, ]
+
+only_non_letters <- data[81:140, ]
+```
+
+
+```{r}
+# Finding Mean for full set of letters
+
+mean_of_letters <- colMeans(only_letters[, 2:18])
+
+mean_of_letters
+
+
+# Finding mean for full set of non-letters
+
+mean_of_non_letters <- colMeans(only_non_letters[, 2:18])
+
+mean_of_non_letters
+
+```
+
+
+For **median** and **standard deviation**, we used 'data.matrix' as 'colMedians' function only takes vector or matrix as input and our data was dataframe.
+
+Example of that:
+
+```{r}
+median_of_non_letters <- colMedians(data.matrix(only_non_letters[, 2:18]))
+
+median_of_non_letters
+```
+
+Then as part of statistical analysis, we calculated **skewness** of each of the feature of letters as well as non-letters. 
+
+However, we did not calculate skewness of **connected_areas** and **eyes** as those features had random values and we cannot gain any statistical interference with random values for the rest of the data.
+
+
+Now out of all the features, we will select features which have the skewdness closes to zero. 
+For features that are closes to zero, that means the data is symmetrical and these maybe be helpful for discriminating between letters and digits.
+
+We calculated the following features having skewdness closest to zero:
+
+
+
+```{r}
+only_letter_rows_with_3p_skew = skewness(only_letters$rows_with_3p)
+only_letter_rows_with_3p_skew
+
+only_non_letter_rows_with_3p_skew = skewness(only_non_letters$rows_with_3p)
+only_non_letter_rows_with_3p_skew
+
+only_letter_no_neigh_right_skew = skewness(only_letters$no_neigh_right)
+only_letter_no_neigh_right_skew
+
+only_non_letter_no_neigh_right_skew= skewness(only_non_letters$no_neigh_right)
+only_non_letter_no_neigh_right_skew
+
+only_letter_no_neigh_vert_skew = skewness(only_letters$no_neigh_vert)
+only_letter_no_neigh_vert_skew
+
+only_non_letter_no_neigh_vert_skew = skewness(only_non_letters$no_neigh_vert)
+only_non_letter_no_neigh_vert_skew
+
+only_letter_no_neigh_left_skew = skewness(only_letters$no_neigh_left)
+only_letter_no_neigh_left_skew
+
+only_non_letter_no_neigh_left_skew = skewness(only_non_letters$no_neigh_left)
+only_non_letter_no_neigh_left_skew
+
+```
+
+
+Based on the skewdness of all other features, I suggest **no_neigh_left, rows_with_3p, no_neigh_right, no_neigh_vert** features will be most helpful for discriminating between letters and non-letters.
+
+Since out of the above four features, **row_with_3p, no_neigh_right** and **no_neigh_left** have the skewdness, closest to 0, we'll draw visualisation for them.
+
+```{r}
+#
+# histogram  of  feature 
+# values for the groups
+
+df = data.frame(y = c(data$rows_with_3p, data$no_neigh_left, data$no_neigh_right),
+                x = rep(c(0,100), each = 210))
+#full hist
+fullhist = hist(df$y, breaks = 20, main = "Histogram of feature values of groups - Number of rows with 3 Black pixels, number of rows with no neighbouring black pixel in left, number of rows with no neighbouring black pixel in right") #specify more breaks than probably necessary
+#create histograms for the different features using breaks from full histogram
+zerohist = with(subset(df, y == data$rows_with_3p), hist(y, breaks = fullhist$breaks))
+oneshist = with(subset(df, y == data$no_neigh_left), hist(y, breaks = fullhist$breaks))
+morehist = with(subset(df, y == data$no_neigh_right), hist(y, breaks = fullhist$breaks))
+#combine the hists
+combhist = fullhist
+combhist$counts = zerohist$counts - oneshist$counts - morehist$counts
+plot(combhist, main="Histogram  of  feature 
+values for the groups", xlab= "rows_with_3p, no_neigh_left, no_neigh_right")
+
+
+
+```
+
+
+
+## Section 3.3
+
+Now, to check which features are most useful to discriminate whether an image is a letter or a non-letter, following are the two statistic analysis we can use:
+
+1) Randomization test
+2) T-Test
+
+To check which of the either test to use, we first calculate the skewdness of the data.
+
+If the data is extremely skewed (< -1 or > 1), we use randomization test. However as we calculated in Section 3.2, all of our features have skewdness value of higher than -1 and less than 1. Also, in practice t test is better than randomization test.
+
+Thus we will only use t-test. We will use two sided t-tests since mean of both the groups differ.
+
+We perform the t-test on all the features to calculate the t score and p-values:
+
+```{r}
+t.test(only_letters$nr_pix, only_non_letters$nr_pix)
+
+t.test(only_letters$rows_with_1, only_non_letters$rows_with_1)
+
+t.test(only_letters$cols_with_1, only_non_letters$cols_with_1)
+
+t.test(only_letters$rows_with_3p, only_non_letters$rows_with_3p)
+
+t.test(only_letters$cols_with_3p, only_non_letters$cols_with_3p)
+
+t.test(only_letters$aspect_ratio, only_non_letters$aspect_ratio)
+
+t.test(only_letters$neigh_1, only_non_letters$neigh_1)
+
+t.test(only_letters$no_neigh_above, only_non_letters$no_neigh_above)
+
+t.test(only_letters$no_neigh_below, only_non_letters$no_neigh_below)
+
+t.test(only_letters$no_neigh_left, only_non_letters$no_neigh_left)
+
+t.test(only_letters$no_neigh_right, only_non_letters$no_neigh_right)
+
+t.test(only_letters$no_neigh_horiz, only_non_letters$no_neigh_horiz)
+
+t.test(only_letters$no_neigh_vert, only_non_letters$no_neigh_vert)
+
+t.test(only_letters$custom, only_non_letters$custom)
+
+```
+
+Now we know that if the p-value of any of the t-test is less than 0.05, that means that it is significant and there is indeed a difference. Thus features with p-values < 0.05 will be used to discriminate between letters and non-letters.
+
+Based on the above t-tests,
+
+
+**cols_with_3p, neigh_1, no_neigh_vert, custom** have p-values less than 0.05.
+
+Thus, **cols_with_3p, neigh_1, no_neigh_vert, custom** features are most suitable for discriminating whether an image is a letter or a non-letter.
+
+These features will be really helpful for further machine learning task. This gives statistical proof that the letters and non-letters are vastly different.
+
+Plotting **cols_with_3p** t-test:
+
+```{r}
+library(gginference)
+
+ggttest(t.test(only_letters$cols_with_3p, only_non_letters$cols_with_3p))
+
+```
+
+Plotting **neigh_1** t-test:
+
+```{r}
+ggttest(t.test(only_letters$neigh_1, only_non_letters$neigh_1))
+
+```
+
+
+Plotting **no_neigh_vert** t-test:
+
+```{r}
+ggttest(t.test(only_letters$no_neigh_vert, only_non_letters$no_neigh_vert))
+
+```
+
+Plotting **custom** t-test:
+
+```{r}
+ggttest(t.test(only_letters$custom, only_non_letters$custom))
+
+```
+
+## Section 3.4
+
+
+We perform the 'cor()' function instead of 'cor.test()' for multiple columns. In this case, these columns means features.
+
+Thus we use the following code to measure the degree of linear association between the features:
+
+```{r}
+# Calculating degree of linear association between features 
+
+cor(data[, 3:15])
+```
+
+
+Here we get different columns and rows showing the linear association between different features. All the values seen from the code are correlation coefficient (r).
+
+We know that if r > 0.7, it means there's high association. If r is between 0.5 - 0.7, there is moderate association. And if  r is between 0.3 - 0.5, there is low association.
+
+From the above r values, following are the features with high association:
+
+```{r}
+correlation_data <- data
+
+ggstatsplot::ggcorrmat(
+  data = correlation_data[, 3:15],
+  type = "parametric",
+  colors = c("darkred", "white", "steelblue")
+)
+```
+(Image in code is more enlarged)
+
+Following are the top three features with highest linear association (here we are stating features with r > 0.7). Note that there are many features with high linear association but we're only stating the top three. We can see features with high-correlation having blue color in the above plot. Top three features with highest correlation:
+
+**no_neigh_below** and **no_neigh_above**
+
+- These features might have high association because they're in the opposite side, and these features accept black pixels on the left and right side, which will be very similar. Hence high association.
+
+**rows_with_3p** and **nr_pix**
+
+- Number of pixels objectively means number of black pixel which will be a high value. The strong linear association just shows that instead of columns, it is rows that have the most number of black pixels and in this case, since this is calculating rows with three black pixels which is higher than rows with just one black pixel, the linear association is high with number of black pixels in total.
+
+**no_neigh_right** and **no_neigh_left**
+
+- As in the first case, since they're in the opposite side, these features accept black pixels above and below which will be similar values. That is why they have high association.
+
+
+# Section 4
+
+## Section 4.1
+
+To predict the value of aspect_ratio from other features, we have different regression models to pick from. I picked the AIC approach which does step-elimination using 'stepAIC' function. This approach is similar to the adjusted R^2 approach. 
+This model penalizes for adding more variables to the model and does step elimination to remove the variables till the perfect model is found.
+
+As per AIC, the best model for feature selection allows to see the most variation with just lowest independent variables possible that are in the data.
+
+Lower the AIC value, the better the model is. 
+
+For this model, we use backward elimination that means that the model will begin with all the variables at first and then step-wise elimination the variables depending on the AIC value to find the best model. This is very helpful in our case as our data have large amount of variables. Starting from one variable to add all the variables will variably take more time and computation than just starting with all at once and gradually reducing.
+
+First step, we add the library that allows us to use the AIC model:
+
+```{r}
+# Adding MASS library 
+
+library(MASS)
+```
+
+
+We create a model of different combinations first:
+
+```{r}
+model <- lm(aspect_ratio ~ nr_pix + rows_with_1 + cols_with_1 + rows_with_3p +
+              cols_with_3p + neigh_1 + no_neigh_above + no_neigh_below + no_neigh_left +
+              no_neigh_right + no_neigh_horiz + no_neigh_vert + custom, data = data)
+
+summary(model)
+```
+
+
+As before, we do not include **connected_areas** and **eyes** feature as they were randomly sampled and have no statistical significane.
+
+We then run the stepAIC model with backwards elimination.
+
+```{r}
+stepAIC(model, direction = "backward")
+```
+
+
+As we can see the AIC model calculated the AIC values, and with the AIC value of **242.37**, the model showed that **nr_pix, neigh_1, no_neigh_below, no_neigh_right, custom** are the best features to predict **aspect_ratio**.
+
+
+Once that is done, we fit a regression model with the above features and report the result.
+
+```{r}
+# Regression model
+
+result <- lm(aspect_ratio ~ nr_pix + neigh_1 + no_neigh_below + no_neigh_right + custom, data = data)
+
+result
+
+summary(result)
+```
+
+
+## Section 4.2
+
+From Section 3.3, we figured that the most discriminatory features to differentiate letters and non-letters are **cols_with_3p, neigh_1, no_neigh_vert, custom**.
+
+We will use these to fit a logistic regression model. At first, we create a separate dataframe to use the logistic regression model.
+
+```{r}
+data_for_regression <- data
+
+data_for_regression
+```
+
+Since we need to use categorical factors as the logistic regression model only uses them, we need to look out for our data.
+
+Our data raw is not a categorical factor, we need to convert them to categorical features as done below:
+
+```{r}
+data_for_regression$cols_with_3p <- as.factor(data_for_regression$cols_with_3p)
+
+data_for_regression$neigh_1 <- as.factor(data_for_regression$neigh_1)
+
+data_for_regression$no_neigh_vert <- as.factor(data_for_regression$no_neigh_vert)
+
+data_for_regression$aspect_ratio <- as.factor(data_for_regression$aspect_ratio)
+
+```
+
+We were asked to choose only three features so we used **cols_with_3p, neigh_1, no_neigh_vert**.
+
+We found the most discriminating feature to be **cols_with3p** with p-value of -1.902, so we'll use that for the logistic regression model.
+
+Now we fit a logistic regression model and summarize the results:
+
+```{r}
+logistic <- glm(aspect_ratio ~ cols_with_3p, data = data_for_regression, family="binomial")
+
+summary(logistic)
+```
+
+Here, the deviance residuals from the summary look good confirming the model is fit as most of them are close to being centered on zero and are roughly symmetrical other than one exception of Min.
+
+We can also see that the Pr value of **cols_with_3p** is greater than 0. This means that as cols_with_3p increases, probability of predicting the aspect_ratio increases.
+
+Since the p-value is below 0.05, the log(odds) are statistically significant.
+
+I decided to use the regression model for **aspect_ratio** feature as that is what I deemed to be useful. I unfortunately had difficulties in how to fit a regression model for the entire data, so I used it for aspect_ratio feature.
+
+Then I plotted the visualisation of the regression model:
+
+```{r}
+# To draw graph, we start by creating a new data frame that contains the
+# probabilities of predicted aspect ration with actual
+# aspect _ratio
+
+predicted_data <- data.frame(likely_aspect_ratio = logistic$fitted.values,
+                             aspect_ratio = data_for_regression$aspect_ratio)
+
+# then we sort data frame from low probabilities to high probabilities
+
+predicted_data <- predicted_data[order(predicted_data$likely_aspect_ratio, decreasing =FALSE),]
+
+# Then we add a new column to the data frame that has the rank of each sample, from low probability
+# to high probability
+
+predicted_data$rank <- 1:nrow(predicted_data)
+
+ggplot(data=predicted_data, aes(x=rank, y=likely_aspect_ratio)) +
+  geom_point(aes(color=aspect_ratio), alpha = 1, shape = 4, stroke = 2) +
+  xlab("cols_with_3p") +
+  ylab("Predicted values of aspect ratio")
+
+ggplot(predicted_data, aes(x=rank, fill=as.factor(likely_aspect_ratio))) +
+  geom_histogram(binwidth=.2, alpha=.5, position='identity')
+```
+
+I made both a graph and a histogram. The probability beteween 0 and 1 which is good.
+
+As the **cols_with_3p** value increases, the probability of predicting **aspect_ratio** increases.
+
+## Section 4.3
+
+```{r include=FALSE}
+source("./section4_code.r")
+```
+
+
+For section 4.3, I will explain in steps how I have tackled this issue.
+
+1) At first, I calculated median of **nr_pixel,aspect_ratio, neigh_1** of every image. Then I turn them into categorical variable, naming them as **split1, split2, split3**.
+
+```{r}
+# Calculating medians
+
+
+median_of_nr_pixels <- colMedians(data.matrix(data[, 3]))
+median_of_nr_pixels
+
+median_of_aspect_ratio <- colMedians(data.matrix(data[, 8]))
+median_of_aspect_ratio
+
+median_of_neigh_1 <- colMedians(data.matrix(data[, 9]))
+median_of_neigh_1
+
+# Categorical variable for each
+
+data$split1 <- as.factor(ifelse(data$nr_pix > median_of_nr_pixels, 1, 0))
+
+data$split2 <- as.factor(ifelse(data$aspect_ratio > median_of_aspect_ratio, 1, 0))
+
+data$split3 <- as.factor(ifelse(data$neigh_1 > median_of_neigh_1, 1, 0))
+
+```
+
+In the above code, in split variables, if the values in **nr_pix, aspect_ratio, neigh_1** are greater than the median of the entire column, the split variable will be 1. Otherwise, it will be 0.
+
+
+2) After that is done, I count the number of 1 in individual split variables. This will be the total number of 1s in each split variable.
+
+
+```{r}
+# Counting number of 1s in individual split variables
+
+count_of_split_1 = 0
+
+for (i in data$split1) {
+  if (i == 1) {
+    count_of_split_1 = count_of_split_1 + 1
+  }
+}
+
+
+count_of_split_2 = 0
+
+for (i in data$split2) {
+  if (i == 1) {
+    count_of_split_2 = count_of_split_2 + 1
+  }
+}
+
+
+count_of_split_3 = 0
+
+for (i in data$split3) {
+  if (i == 1) {
+    count_of_split_3 = count_of_split_3 + 1
+  }
+}
+```
+
+
+3) After that, we calculate proportions for letters, faces and exclamatory mark images in the files.
+
+I'll explain how I did it for letters and this same algorithm is followed for faces and exclamatory marks.
+
+I first make three count variabnles that store the number of times the letters' value is 1 in the split variables.
+
+Then I go through each values in the **nr_pixel, aspect_ratio, neigh_1** columns of **just letters**. If the value equals to 1, the count value is incremented by one. Following is the code showing that:
+
+```{r}
+# for letters
+
+letters_count_of_split_1 = 0 
+
+for (i in data[1:80, 19]) {
+  if (i == 1) {
+    letters_count_of_split_1 = letters_count_of_split_1 + 1
+  }
+}
+
+letters_count_of_split_1
+
+letters_count_of_split_2 = 0 
+
+for (i in data[1:80, 20]) {
+  if (i == 1) {
+    letters_count_of_split_2 = letters_count_of_split_2 + 1
+  }
+}
+
+letters_count_of_split_2
+
+letters_count_of_split_3 = 0 
+
+for (i in data[1:80, 21]) {
+  if (i == 1) {
+    letters_count_of_split_3 = letters_count_of_split_3 + 1
+  }
+}
+
+letters_count_of_split_3
+```
+
+
+Now to calculate the proportion that the letters have in each split variable, I divide the count of letters in each split variable with the total number of counts in the split variable.
+
+Since this answer can be in many decimal points and we want a proportion, I round off the value to 2 digits. Following is the code:
+
+```{r}
+letters_split_1_proportion = round(letters_count_of_split_1 / count_of_split_1, digits = 2)
+letters_split_1_proportion
+
+letters_split_2_proportion = round(letters_count_of_split_2 / count_of_split_2, digits = 2)
+letters_split_2_proportion
+
+letters_split_3_proportion = round(letters_count_of_split_3 / count_of_split_3, digits = 2)
+letters_split_3_proportion
+
+```
+
+
+This is repeated for face and exclamatory mark.
+
+4)
+
+Then finally, I create a table with all the proportions. For this, I create a 3x3 matrix and then add rownames and columnnames to it. Then I view it as a table.
+
+```{r}
+result <- matrix(c(letters_split_1_proportion, letters_split_2_proportion, letters_split_3_proportion,
+                  face_split_1_proportion, face_split_2_proportion, face_split_3_proportion,
+                  xclaim_split_1_proportion, xclaim_split_2_proportion, xclaim_split_3_proportion),
+                ncol = 3, nrow = 3)
+
+colnames(result) <- c("Split1", "Split2", "Split3")
+rownames(result) <- c("Letters", "Faces", "Exclamation Marks")
+
+result
+
+final_result <- as.table(result)
+```
+
+
+The final result shows as:
+
+
+```{r}
+final_result
+```
+
+This table shows the proportion of 1s for each of
+the three classes, **letters, faces and xclaim**
+
+
+## Section 4.4
+
+Your work for this subsection here.
